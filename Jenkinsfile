@@ -24,7 +24,12 @@ pipeline {
                 sh 'python3 -m unittest discover'
             }
         }
-
+        stage('Install dependencies') {
+            steps {
+                sh 'pip install -r requirements.txt'
+                sh 'pip install coverage'  // Ensure coverage is installed
+            }
+        }
         stage('Code Coverage') {
             steps {
                 sh 'coverage run -m unittest discover'
