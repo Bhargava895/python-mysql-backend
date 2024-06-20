@@ -1,0 +1,116 @@
+version: 2.1
+
+orbs:
+  gcp-cli: circleci/gcp-cli@3.1.1 
+  gcp-gcr: circleci/gcp-gcr@0.15.3
+
+jobs:
+  
+  build-and-test: 
+    docker:
+      - image: cimg/python:3.10
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            pip install -r requirements.txt
+      - run:
+          name: Run tests and store data
+          command: |
+            mkdir test-results
+            pytest --cov=./ --junitxml=test-results/test-results.xml
+      - store_artifacts:
+          path: test-results
+          destination: test-results
+      - run:
+          name: Generate code coverage report
+          command: |
+            coverage xml -o coverage.xml
+            coverage html -d coverage_html
+      - store_artifacts:
+          path: coverage.xml
+          destination: coverage-reports
+      - store_artifacts:
+          path: coverage_html
+          destination: coverage-reports
+          
+  sonarqube-scan:
+    docker:
+      - image: circleci/python:3.8
+    steps:
+      - checkout
+      - run:
+          name: Install SonarScanner
+          command: |
+            curl -L -o sonar-scanner-cli.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.6.2.2472-linux.zip
+            unzip sonar-scanner-cli.zip -d /tmp/
+            export PATH="$PATH:/tmp/sonar-scanner-4.6.2.2472-linux/bin"
+      - run:
+          name: SonarQube scan
+          command: |
+            export PATH="$PATH:/tmp/sonar-scanner-4.6.2.2472-linux/bin"
+            sonar-scanner \
+              -Dsonar.projectKey=user-service \
+              -Dsonar.organization=user-service \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=http://3.93.247.5:9000/ \
+              -Dsonar.login=squ_5bdca88dbb5b3a6c4009be874ae63ec23f3c518f
+  
+  build-docker-image:
+    docker:
+      - image: google/cloud-sdk:latest
+
+    steps:
+      - checkout
+
+      # Install any dependencies or additional tools you need
+
+      # Authenticate with GCP using Workload Identity Pool
+      - run:
+          name: Authenticate with GCP
+          command: |
+            gcloud auth activate-service-account --key-file=${GOOGLE_APPLICATION_CREDENTIALS}
+            gcloud config set project amittechnet-408508
+
+      # # Docker build and push to GCR
+      # - run:
+      #     name: Docker Build and Push
+      #     command: |
+      #       # Set your Docker image name and tag
+      #       IMAGE_NAME=gcr.io/${GCLOUD_PROJECT_ID}/your-app
+      #       TAG=${CIRCLE_SHA1:-latest} # You can use the commit SHA or another tag
+
+      #       # Build the Docker image
+      #       docker build -t ${IMAGE_NAME}:${TAG} .
+
+      #       # Authenticate Docker with GCR
+      #       gcloud auth configure-docker gcr.io
+
+      #       # Push the Docker image to GCR
+      #       docker push ${IMAGE_NAME}:${TAG}
+
+      # docker:
+      # - image: cimg/python:3.12.1-browsers
+
+      # steps:
+      # - checkout
+      # - setup_remote_docker:
+      #     version: 19.03.13
+      #     docker_layer_caching: true
+      # - run:
+      #     name: Build and push image
+      #     command: |
+      #       docker build -t gcr.io/amittechnet-408508/python-service-app .
+      #       echo $GCLOUD_SERVICE_KEY | docker login -u _json_key --password-stdin https://gcr.io
+      #       docker push gcr.io/amittechnet-408508/python-service-app:latest
+   
+    
+workflows:
+  version: 2
+  ci:
+    jobs:
+      - build-and-test
+      - sonarqube-scan
+      - build-docker-image
+          
