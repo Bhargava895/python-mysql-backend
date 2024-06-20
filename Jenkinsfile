@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'master', url: 'https://github.com/Bhargava895/python-app.git'
+                git branch: 'master', url: 'https://github.com/Bhargava895/python-mysql-backend.git'
             }
         }
 
